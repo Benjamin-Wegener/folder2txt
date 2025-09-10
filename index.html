@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Folder to Text Merger</title>
+    <title>Folder2Txt — Merge Folder to Text</title>
     <style>
         * {
             margin: 0;
@@ -114,61 +114,6 @@
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
-        .file-types {
-            margin-bottom: 30px;
-        }
-
-        .section-title {
-            font-size: 1.3em;
-            color: #333;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-
-        .file-type-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px;
-        }
-
-        .file-type-item {
-            display: flex;
-            align-items: center;
-            padding: 12px 15px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .file-type-item:hover {
-            background: #e9ecef;
-            transform: translateY(-2px);
-        }
-
-        .file-type-item input[type="checkbox"] {
-            margin-right: 10px;
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .file-type-item label {
-            cursor: pointer;
-            font-weight: 500;
-            color: #495057;
-            flex: 1;
-        }
-
-        .file-count {
-            background: #667eea;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.8em;
-            margin-left: 10px;
-        }
-
         .options {
             background: #f8f9fa;
             padding: 25px;
@@ -205,33 +150,30 @@
             border-color: #667eea;
         }
 
-        .checkbox-option {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .checkbox-option input[type="checkbox"] {
-            margin-right: 10px;
-            width: 18px;
-            height: 18px;
-        }
-
-        .process-btn {
+        .process-btn, .copy-btn {
             width: 100%;
             padding: 18px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
             border: none;
             border-radius: 12px;
             font-size: 1.2em;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
-        .process-btn:hover:not(:disabled) {
+        .process-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            display: none;
+        }
+
+        .process-btn:hover:not(:disabled), .copy-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
         }
@@ -308,6 +250,24 @@
             display: none;
         }
 
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 0.9em;
+            color: #666;
+            border-top: 1px solid #eee;
+            margin-top: 20px;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -322,8 +282,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📁 Folder to Text Merger</h1>
-            <p>Drag & drop a folder, select file types, and merge them into a single text file</p>
+            <h1>📁 Folder2Txt</h1>
+            <p>Drag & drop a folder of .txt files — merge them in seconds, no uploads</p>
         </div>
         
         <div class="content">
@@ -337,30 +297,15 @@
                 </div>
             </div>
 
-            <div class="file-types">
-                <h3 class="section-title">Select File Types to Include</h3>
-                <div class="file-type-grid" id="fileTypeGrid">
-                    <!-- File types will be populated here -->
-                </div>
-            </div>
-
             <div class="options">
                 <h3 class="section-title">Options</h3>
                 <div class="option-item">
-                    <label class="option-label" for="separator">File Separator</label>
+                    <label class="option-label" for="separator">Separator Between Files</label>
                     <input type="text" id="separator" class="option-input" value="--- {filename} ---" placeholder="--- {filename} ---">
                 </div>
                 <div class="option-item">
                     <label class="option-label" for="outputName">Output Filename</label>
                     <input type="text" id="outputName" class="option-input" value="merged_files.txt" placeholder="merged_files.txt">
-                </div>
-                <div class="checkbox-option">
-                    <input type="checkbox" id="includePath" checked>
-                    <label for="includePath">Include relative path in filename</label>
-                </div>
-                <div class="checkbox-option">
-                    <input type="checkbox" id="addNumbers" checked>
-                    <label for="addNumbers">Add file numbers</label>
                 </div>
             </div>
 
@@ -369,9 +314,19 @@
                 <div class="progress-fill" id="progressFill"></div>
             </div>
 
-            <button class="process-btn" id="processBtn" disabled>Process Files</button>
+            <button class="process-btn" id="processBtn" disabled>Merge Files</button>
+            <button class="copy-btn" id="copyBtn">📋 Copy to Clipboard</button>
 
             <div class="file-list" id="fileList"></div>
+        </div>
+
+        <div class="footer">
+            <p>
+                Made with ❤️ — <a href="https://github.com/Benjamin-Wegener/folder2txt" target="_blank">View on GitHub</a>
+                &nbsp;•&nbsp;
+                <a href="https://benjamin-wegener.github.io/folder2txt" target="_blank">Live Demo</a>
+            </p>
+            <p>🔒 100% client-side — your files never leave your browser.</p>
         </div>
     </div>
 
@@ -379,20 +334,19 @@
         class FolderTextMerger {
             constructor() {
                 this.files = [];
-                this.selectedTypes = new Set();
-                this.commonTypes = new Set(['txt', 'js', 'html', 'css', 'json', 'md', 'py', 'java', 'cpp', 'c', 'h', 'xml', 'yaml', 'yml', 'sql', 'sh', 'bat', 'csv', 'log', 'conf', 'ini', 'config']);
+                this.mergedContent = '';
                 this.init();
             }
 
             init() {
                 this.setupEventListeners();
-                this.populateFileTypes();
             }
 
             setupEventListeners() {
                 const dropZone = document.getElementById('dropZone');
                 const fileInput = document.getElementById('fileInput');
                 const processBtn = document.getElementById('processBtn');
+                const copyBtn = document.getElementById('copyBtn');
 
                 // Drag and drop events
                 dropZone.addEventListener('dragover', (e) => {
@@ -419,32 +373,10 @@
                 processBtn.addEventListener('click', () => {
                     this.processFiles();
                 });
-            }
 
-            populateFileTypes() {
-                const grid = document.getElementById('fileTypeGrid');
-                const types = Array.from(this.commonTypes).sort();
-                
-                types.forEach(type => {
-                    const item = document.createElement('div');
-                    item.className = 'file-type-item';
-                    item.innerHTML = `
-                        <input type="checkbox" id="type-${type}" value="${type}">
-                        <label for="type-${type}">.${type}</label>
-                        <span class="file-count" id="count-${type}">0</span>
-                    `;
-                    
-                    const checkbox = item.querySelector('input');
-                    checkbox.addEventListener('change', (e) => {
-                        if (e.target.checked) {
-                            this.selectedTypes.add(type);
-                        } else {
-                            this.selectedTypes.delete(type);
-                        }
-                        this.updateProcessButton();
-                    });
-                    
-                    grid.appendChild(item);
+                // Copy button
+                copyBtn.addEventListener('click', () => {
+                    this.copyToClipboard();
                 });
             }
 
@@ -462,17 +394,19 @@
                 }
 
                 Promise.all(promises).then(() => {
-                    this.updateFileTypes();
+                    this.filterTextFiles();
+                    this.showFileList();
                     this.updateProcessButton();
-                    this.showStatus(`Found ${this.files.length} files`, 'success');
+                    this.showStatus(`Found ${this.files.length} .txt files`, 'success');
                 });
             }
 
             handleFileInput(fileList) {
                 this.files = Array.from(fileList);
-                this.updateFileTypes();
+                this.filterTextFiles();
+                this.showFileList();
                 this.updateProcessButton();
-                this.showStatus(`Found ${this.files.length} files`, 'success');
+                this.showStatus(`Found ${this.files.length} .txt files`, 'success');
             }
 
             traverseFileTree(item, path = '') {
@@ -505,32 +439,20 @@
                 });
             }
 
-            updateFileTypes() {
-                const typeCounts = {};
-                
-                this.files.forEach(file => {
-                    const extension = this.getFileExtension(file.name);
-                    if (extension) {
-                        typeCounts[extension] = (typeCounts[extension] || 0) + 1;
-                    }
-                });
-
-                // Update counts
-                Object.keys(typeCounts).forEach(type => {
-                    const countElement = document.getElementById(`count-${type}`);
-                    if (countElement) {
-                        countElement.textContent = typeCounts[type];
-                    }
-                });
-
-                // Show file list
-                this.showFileList();
+            filterTextFiles() {
+                this.files = this.files.filter(file => 
+                    file.name.toLowerCase().endsWith('.txt')
+                );
             }
 
             showFileList() {
                 const fileList = document.getElementById('fileList');
+                if (this.files.length === 0) {
+                    fileList.style.display = 'none';
+                    return;
+                }
                 fileList.style.display = 'block';
-                fileList.innerHTML = '<h4 style="margin-bottom: 15px;">Files Found:</h4>';
+                fileList.innerHTML = '<h4 style="margin-bottom: 15px;">.txt Files Found:</h4>';
                 
                 this.files.slice(0, 50).forEach(file => {
                     const item = document.createElement('div');
@@ -548,17 +470,9 @@
                 }
             }
 
-            getFileExtension(filename) {
-                const parts = filename.split('.');
-                return parts.length > 1 ? parts.pop().toLowerCase() : '';
-            }
-
             updateProcessButton() {
                 const processBtn = document.getElementById('processBtn');
-                const hasFiles = this.files.length > 0;
-                const hasSelectedTypes = this.selectedTypes.size > 0;
-                
-                processBtn.disabled = !(hasFiles && hasSelectedTypes);
+                processBtn.disabled = this.files.length === 0;
             }
 
             showStatus(message, type) {
@@ -577,30 +491,23 @@
             async processFiles() {
                 const separator = document.getElementById('separator').value;
                 const outputName = document.getElementById('outputName').value || 'merged_files.txt';
-                const includePath = document.getElementById('includePath').checked;
-                const addNumbers = document.getElementById('addNumbers').checked;
                 
                 const progressBar = document.getElementById('progressBar');
                 const progressFill = document.getElementById('progressFill');
                 const processBtn = document.getElementById('processBtn');
+                const copyBtn = document.getElementById('copyBtn');
                 
                 progressBar.style.display = 'block';
                 processBtn.disabled = true;
-                this.showStatus('Processing files...', 'processing');
+                this.showStatus('Merging files...', 'processing');
                 
-                const filteredFiles = this.files.filter(file => {
-                    const extension = this.getFileExtension(file.name);
-                    return this.selectedTypes.has(extension);
-                });
-
                 let mergedContent = '';
                 let processed = 0;
 
-                for (let i = 0; i < filteredFiles.length; i++) {
-                    const file = filteredFiles[i];
-                    const displayName = includePath ? (file.relativePath || file.name) : file.name;
-                    const fileNumber = addNumbers ? `[${i + 1}] ` : '';
-                    const fileSeparator = separator.replace('{filename}', fileNumber + displayName);
+                for (let i = 0; i < this.files.length; i++) {
+                    const file = this.files[i];
+                    const displayName = file.relativePath || file.name;
+                    const fileSeparator = separator.replace('{filename}', displayName);
                     
                     try {
                         const content = await this.readFile(file);
@@ -611,14 +518,19 @@
                     }
                     
                     processed++;
-                    const progress = (processed / filteredFiles.length) * 100;
+                    const progress = (processed / this.files.length) * 100;
                     progressFill.style.width = progress + '%';
                 }
+
+                this.mergedContent = mergedContent;
+
+                // Show copy button
+                copyBtn.style.display = 'block';
 
                 // Download the merged file
                 this.downloadFile(mergedContent, outputName);
                 
-                this.showStatus(`Successfully merged ${filteredFiles.length} files!`, 'success');
+                this.showStatus(`✅ Merged ${this.files.length} files!`, 'success');
                 progressBar.style.display = 'none';
                 processBtn.disabled = false;
             }
@@ -642,6 +554,17 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
+            }
+
+            copyToClipboard() {
+                navigator.clipboard.writeText(this.mergedContent)
+                    .then(() => {
+                        this.showStatus('📋 Copied to clipboard!', 'success');
+                    })
+                    .catch(err => {
+                        this.showStatus('❌ Failed to copy', 'error');
+                        console.error('Copy failed:', err);
+                    });
             }
         }
 

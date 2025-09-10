@@ -16,6 +16,16 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+        }
+
+        /* GitHub Ribbon */
+        .github-ribbon {
+            position: absolute;
+            right: 0;
+            top: 0;
+            z-index: 1000;
+            pointer-events: all;
         }
 
         .container {
@@ -25,6 +35,8 @@
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             overflow: hidden;
+            position: relative;
+            z-index: 10;
         }
 
         .header {
@@ -112,6 +124,64 @@
             background: #5a67d8;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .file-types {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .file-type-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .file-type-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .file-type-item:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .file-type-item input[type="checkbox"] {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .file-type-item label {
+            cursor: pointer;
+            font-weight: 500;
+            color: #495057;
+            flex: 1;
+        }
+
+        .file-count {
+            background: #667eea;
+            color: white;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            margin-left: 6px;
+            white-space: nowrap;
         }
 
         .options {
@@ -277,13 +347,24 @@
         .processing .drop-icon {
             animation: pulse 1.5s infinite;
         }
+
+        @media (max-width: 600px) {
+            .file-type-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- GitHub Ribbon -->
+    <a href="https://github.com/Benjamin-Wegener/folder2txt" class="github-ribbon" target="_blank">
+        <img src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub">
+    </a>
+
     <div class="container">
         <div class="header">
             <h1>📁 Folder2Txt</h1>
-            <p>Drag & drop a folder of .txt files — merge them in seconds, no uploads</p>
+            <p>Drag & drop a folder — merge text, code, logs & more into one file</p>
         </div>
         
         <div class="content">
@@ -294,6 +375,13 @@
                     <div class="drop-hint">or click to browse</div>
                     <input type="file" id="fileInput" class="file-input" webkitdirectory directory multiple>
                     <label for="fileInput" class="browse-btn">Browse Folder</label>
+                </div>
+            </div>
+
+            <div class="file-types">
+                <h3 class="section-title">Select File Types to Include</h3>
+                <div class="file-type-grid" id="fileTypeGrid">
+                    <!-- Dynamically populated -->
                 </div>
             </div>
 
@@ -334,12 +422,18 @@
         class FolderTextMerger {
             constructor() {
                 this.files = [];
+                this.selectedTypes = new Set();
+                this.commonTypes = new Set([
+                    'txt', 'js', 'html', 'css', 'json', 'md', 'py', 'java', 'cpp', 'c', 'h',
+                    'xml', 'yaml', 'yml', 'sql', 'sh', 'bat', 'csv', 'log', 'conf', 'ini', 'config'
+                ]);
                 this.mergedContent = '';
                 this.init();
             }
 
             init() {
                 this.setupEventListeners();
+                this.populateFileTypes();
             }
 
             setupEventListeners() {
@@ -380,6 +474,38 @@
                 });
             }
 
+            populateFileTypes() {
+                const grid = document.getElementById('fileTypeGrid');
+                const types = Array.from(this.commonTypes).sort();
+
+                types.forEach(type => {
+                    const item = document.createElement('div');
+                    item.className = 'file-type-item';
+                    item.innerHTML = `
+                        <input type="checkbox" id="type-${type}" value="${type}">
+                        <label for="type-${type}">.${type}</label>
+                        <span class="file-count" id="count-${type}">0</span>
+                    `;
+
+                    const checkbox = item.querySelector('input');
+                    checkbox.addEventListener('change', (e) => {
+                        if (e.target.checked) {
+                            this.selectedTypes.add(type);
+                        } else {
+                            this.selectedTypes.delete(type);
+                        }
+                        this.updateProcessButton();
+                    });
+
+                    grid.appendChild(item);
+                });
+
+                // Default: pre-select .txt
+                this.selectedTypes.add('txt');
+                const txtCheckbox = document.getElementById('type-txt');
+                if (txtCheckbox) txtCheckbox.checked = true;
+            }
+
             handleFiles(items) {
                 this.files = [];
                 const promises = [];
@@ -394,19 +520,17 @@
                 }
 
                 Promise.all(promises).then(() => {
-                    this.filterTextFiles();
-                    this.showFileList();
+                    this.updateFileTypes();
                     this.updateProcessButton();
-                    this.showStatus(`Found ${this.files.length} .txt files`, 'success');
+                    this.showStatus(`Found ${this.files.length} files`, 'success');
                 });
             }
 
             handleFileInput(fileList) {
                 this.files = Array.from(fileList);
-                this.filterTextFiles();
-                this.showFileList();
+                this.updateFileTypes();
                 this.updateProcessButton();
-                this.showStatus(`Found ${this.files.length} .txt files`, 'success');
+                this.showStatus(`Found ${this.files.length} files`, 'success');
             }
 
             traverseFileTree(item, path = '') {
@@ -439,10 +563,26 @@
                 });
             }
 
-            filterTextFiles() {
-                this.files = this.files.filter(file => 
-                    file.name.toLowerCase().endsWith('.txt')
-                );
+            updateFileTypes() {
+                const typeCounts = {};
+
+                this.files.forEach(file => {
+                    const extension = this.getFileExtension(file.name);
+                    if (extension) {
+                        typeCounts[extension] = (typeCounts[extension] || 0) + 1;
+                    }
+                });
+
+                // Update counts
+                Object.keys(typeCounts).forEach(type => {
+                    const countElement = document.getElementById(`count-${type}`);
+                    if (countElement) {
+                        countElement.textContent = typeCounts[type];
+                    }
+                });
+
+                // Show file list
+                this.showFileList();
             }
 
             showFileList() {
@@ -452,8 +592,8 @@
                     return;
                 }
                 fileList.style.display = 'block';
-                fileList.innerHTML = '<h4 style="margin-bottom: 15px;">.txt Files Found:</h4>';
-                
+                fileList.innerHTML = '<h4 style="margin-bottom: 15px;">Files Found:</h4>';
+
                 this.files.slice(0, 50).forEach(file => {
                     const item = document.createElement('div');
                     item.className = 'file-list-item';
@@ -470,9 +610,17 @@
                 }
             }
 
+            getFileExtension(filename) {
+                const parts = filename.split('.');
+                return parts.length > 1 ? parts.pop().toLowerCase() : '';
+            }
+
             updateProcessButton() {
                 const processBtn = document.getElementById('processBtn');
-                processBtn.disabled = this.files.length === 0;
+                const hasFiles = this.files.length > 0;
+                const hasSelectedTypes = this.selectedTypes.size > 0;
+
+                processBtn.disabled = !(hasFiles && hasSelectedTypes);
             }
 
             showStatus(message, type) {
@@ -480,7 +628,7 @@
                 status.className = `status ${type}`;
                 status.textContent = message;
                 status.style.display = 'block';
-                
+
                 if (type === 'success' || type === 'error') {
                     setTimeout(() => {
                         status.style.display = 'none';
@@ -491,24 +639,29 @@
             async processFiles() {
                 const separator = document.getElementById('separator').value;
                 const outputName = document.getElementById('outputName').value || 'merged_files.txt';
-                
+
                 const progressBar = document.getElementById('progressBar');
                 const progressFill = document.getElementById('progressFill');
                 const processBtn = document.getElementById('processBtn');
                 const copyBtn = document.getElementById('copyBtn');
-                
+
                 progressBar.style.display = 'block';
                 processBtn.disabled = true;
                 this.showStatus('Merging files...', 'processing');
-                
+
+                const filteredFiles = this.files.filter(file => {
+                    const extension = this.getFileExtension(file.name);
+                    return this.selectedTypes.has(extension);
+                });
+
                 let mergedContent = '';
                 let processed = 0;
 
-                for (let i = 0; i < this.files.length; i++) {
-                    const file = this.files[i];
+                for (let i = 0; i < filteredFiles.length; i++) {
+                    const file = filteredFiles[i];
                     const displayName = file.relativePath || file.name;
                     const fileSeparator = separator.replace('{filename}', displayName);
-                    
+
                     try {
                         const content = await this.readFile(file);
                         mergedContent += fileSeparator + '\n' + content + '\n\n';
@@ -516,9 +669,9 @@
                         console.error(`Error reading file ${file.name}:`, error);
                         mergedContent += fileSeparator + '\n[Error reading file]\n\n';
                     }
-                    
+
                     processed++;
-                    const progress = (processed / this.files.length) * 100;
+                    const progress = (processed / filteredFiles.length) * 100;
                     progressFill.style.width = progress + '%';
                 }
 
@@ -529,8 +682,8 @@
 
                 // Download the merged file
                 this.downloadFile(mergedContent, outputName);
-                
-                this.showStatus(`✅ Merged ${this.files.length} files!`, 'success');
+
+                this.showStatus(`✅ Merged ${filteredFiles.length} files!`, 'success');
                 progressBar.style.display = 'none';
                 processBtn.disabled = false;
             }

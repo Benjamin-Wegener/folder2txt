@@ -211,6 +211,18 @@
             border-color: #667eea;
         }
 
+        .checkbox-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-option input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
         .process-btn, .copy-btn {
             width: 100%;
             padding: 18px;
@@ -350,7 +362,7 @@
     <div class="container">
         <div class="header">
             <h1>📁 Folder2Txt</h1>
-            <p>Drag & drop a folder — merge code, config, logs & more into one file</p>
+            <p>Drag & drop a folder — merge & optionally clean code/config files</p>
         </div>
         
         <div class="content">
@@ -367,7 +379,9 @@
             <div class="file-types">
                 <h3 class="section-title">Select File Types to Include</h3>
                 <div class="file-type-grid" id="fileTypeGrid">
-                    <!-- Dynamically populated -->
+                    <p id="noFilesHint" style="grid-column: 1 / -1; text-align: center; color: #888; padding: 20px;">
+                        Upload a folder to see detected file types.
+                    </p>
                 </div>
             </div>
 
@@ -380,6 +394,14 @@
                 <div class="option-item">
                     <label class="option-label" for="outputName">Output Filename</label>
                     <input type="text" id="outputName" class="option-input" value="merged_files.txt" placeholder="merged_files.txt">
+                </div>
+                <div class="checkbox-option">
+                    <input type="checkbox" id="cleanMode" checked>
+                    <label for="cleanMode">🧹 Clean & Compress (remove comments + extra whitespace)</label>
+                </div>
+                <div class="checkbox-option">
+                    <input type="checkbox" id="commonOnly">
+                    <label for="commonOnly">📦 Common File Types Only (.txt, .js, .py, .json, .md, .html, .css, .yml, .xml, .sql)</label>
                 </div>
             </div>
 
@@ -407,35 +429,15 @@
             constructor() {
                 this.files = [];
                 this.selectedTypes = new Set();
-                this.commonTypes = new Set([
-                    // Code
-                    'txt', 'js', 'jsx', 'ts', 'tsx', 'py', 'pyi', 'java', 'class', 'jar',
-                    'c', 'cpp', 'cxx', 'cc', 'h', 'hpp', 'cs', 'vb', 'fs', 'swift', 'kt', 'kts',
-                    'go', 'rs', 'rb', 'pl', 'pm', 'lua', 'r', 'scala', 'groovy', 'dart',
-                    
-                    // Web
-                    'html', 'htm', 'xhtml', 'css', 'scss', 'sass', 'less', 'vue', 'svelte',
-                    
-                    // Config & Data
-                    'json', 'jsonc', 'json5', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'config',
-                    'env', 'properties', 'gradle', 'makefile', 'dockerfile', 'gitignore', 'editorconfig',
-                    
-                    // Markup & Docs
-                    'md', 'markdown', 'rst', 'adoc', 'org', 'tex', 'latex',
-                    
-                    // Data & Logs
-                    'csv', 'tsv', 'log', 'sql', 'sqlite', 'db', 'xml', 'xsd', 'xsl', 'xslt',
-                    
-                    // Scripts
-                    'sh', 'bash', 'zsh', 'fish', 'ps1', 'bat', 'cmd', 'awk', 'sed'
-                ]);
                 this.mergedContent = '';
+                this.commonFileTypes = new Set([
+                    'txt', 'js', 'py', 'json', 'md', 'html', 'htm', 'css', 'yaml', 'yml', 'xml', 'sql'
+                ]);
                 this.init();
             }
 
             init() {
                 this.setupEventListeners();
-                this.populateFileTypes();
             }
 
             setupEventListeners() {
@@ -443,6 +445,7 @@
                 const fileInput = document.getElementById('fileInput');
                 const processBtn = document.getElementById('processBtn');
                 const copyBtn = document.getElementById('copyBtn');
+                const commonOnlyCheckbox = document.getElementById('commonOnly');
 
                 // Drag and drop events
                 dropZone.addEventListener('dragover', (e) => {
@@ -474,38 +477,13 @@
                 copyBtn.addEventListener('click', () => {
                     this.copyToClipboard();
                 });
-            }
 
-            populateFileTypes() {
-                const grid = document.getElementById('fileTypeGrid');
-                const types = Array.from(this.commonTypes).sort();
-
-                types.forEach(type => {
-                    const item = document.createElement('div');
-                    item.className = 'file-type-item';
-                    item.innerHTML = `
-                        <input type="checkbox" id="type-${type}" value="${type}">
-                        <label for="type-${type}">.${type}</label>
-                        <span class="file-count" id="count-${type}">0</span>
-                    `;
-
-                    const checkbox = item.querySelector('input');
-                    checkbox.addEventListener('change', (e) => {
-                        if (e.target.checked) {
-                            this.selectedTypes.add(type);
-                        } else {
-                            this.selectedTypes.delete(type);
-                        }
-                        this.updateProcessButton();
-                    });
-
-                    grid.appendChild(item);
+                // Common Only toggle — re-filter on change
+                commonOnlyCheckbox.addEventListener('change', () => {
+                    if (this.files.length > 0) {
+                        this.renderFoundFileTypes();
+                    }
                 });
-
-                // Default: pre-select .txt
-                this.selectedTypes.add('txt');
-                const txtCheckbox = document.getElementById('type-txt');
-                if (txtCheckbox) txtCheckbox.checked = true;
             }
 
             handleFiles(items) {
@@ -522,8 +500,7 @@
                 }
 
                 Promise.all(promises).then(() => {
-                    this.autoSelectFoundTypes();
-                    this.updateFileTypes();
+                    this.renderFoundFileTypes();
                     this.updateProcessButton();
                     this.showStatus(`Found ${this.files.length} files`, 'success');
                 });
@@ -531,8 +508,7 @@
 
             handleFileInput(fileList) {
                 this.files = Array.from(fileList);
-                this.autoSelectFoundTypes();
-                this.updateFileTypes();
+                this.renderFoundFileTypes();
                 this.updateProcessButton();
                 this.showStatus(`Found ${this.files.length} files`, 'success');
             }
@@ -567,45 +543,73 @@
                 });
             }
 
-            autoSelectFoundTypes() {
+            renderFoundFileTypes() {
+                const grid = document.getElementById('fileTypeGrid');
+                const noFilesHint = document.getElementById('noFilesHint');
+                const commonOnly = document.getElementById('commonOnly').checked;
+
+                // Clear previous
+                grid.innerHTML = '';
+                this.selectedTypes.clear();
+
+                if (this.files.length === 0) {
+                    if (noFilesHint) grid.appendChild(noFilesHint);
+                    return;
+                }
+
+                // Collect found extensions
                 const foundTypes = new Set();
-                this.files.forEach(file => {
-                    const ext = this.getFileExtension(file.name);
-                    if (ext) foundTypes.add(ext);
-                });
-
-                // Auto-enable any found file type
-                foundTypes.forEach(type => {
-                    this.selectedTypes.add(type);
-                    const checkbox = document.getElementById(`type-${type}`);
-                    if (checkbox) checkbox.checked = true;
-                });
-
-                // Always ensure .txt is selected
-                this.selectedTypes.add('txt');
-                const txtCheckbox = document.getElementById('type-txt');
-                if (txtCheckbox) txtCheckbox.checked = true;
-            }
-
-            updateFileTypes() {
                 const typeCounts = {};
 
-                this.files.forEach(file => {
-                    const extension = this.getFileExtension(file.name);
-                    if (extension) {
-                        typeCounts[extension] = (typeCounts[extension] || 0) + 1;
+                let filteredFiles = this.files;
+
+                if (commonOnly) {
+                    filteredFiles = this.files.filter(file => {
+                        const ext = this.getFileExtension(file.name);
+                        return this.commonFileTypes.has(ext);
+                    });
+                }
+
+                filteredFiles.forEach(file => {
+                    const ext = this.getFileExtension(file.name);
+                    if (ext) {
+                        foundTypes.add(ext);
+                        typeCounts[ext] = (typeCounts[ext] || 0) + 1;
                     }
                 });
 
-                // Update counts
-                Object.keys(typeCounts).forEach(type => {
-                    const countElement = document.getElementById(`count-${type}`);
-                    if (countElement) {
-                        countElement.textContent = typeCounts[type];
-                    }
+                // If nothing found, fallback to .txt
+                if (foundTypes.size === 0) {
+                    foundTypes.add('txt');
+                    typeCounts['txt'] = 0;
+                }
+
+                // Render checkboxes for found types
+                Array.from(foundTypes).sort().forEach(type => {
+                    const item = document.createElement('div');
+                    item.className = 'file-type-item';
+                    item.innerHTML = `
+                        <input type="checkbox" id="type-${type}" value="${type}" checked>
+                        <label for="type-${type}">.${type}</label>
+                        <span class="file-count" id="count-${type}">${typeCounts[type] || 0}</span>
+                    `;
+
+                    const checkbox = item.querySelector('input');
+                    checkbox.addEventListener('change', (e) => {
+                        if (e.target.checked) {
+                            this.selectedTypes.add(type);
+                        } else {
+                            this.selectedTypes.delete(type);
+                        }
+                        this.updateProcessButton();
+                    });
+
+                    // Auto-add to selected
+                    this.selectedTypes.add(type);
+
+                    grid.appendChild(item);
                 });
 
-                // Show file list
                 this.showFileList();
             }
 
@@ -618,18 +622,28 @@
                 fileList.style.display = 'block';
                 fileList.innerHTML = '<h4 style="margin-bottom: 15px;">Files Found:</h4>';
 
-                this.files.slice(0, 50).forEach(file => {
+                const commonOnly = document.getElementById('commonOnly').checked;
+                let displayFiles = this.files;
+
+                if (commonOnly) {
+                    displayFiles = this.files.filter(file => {
+                        const ext = this.getFileExtension(file.name);
+                        return this.commonFileTypes.has(ext);
+                    });
+                }
+
+                displayFiles.slice(0, 50).forEach(file => {
                     const item = document.createElement('div');
                     item.className = 'file-list-item';
                     item.textContent = file.relativePath || file.name;
                     fileList.appendChild(item);
                 });
 
-                if (this.files.length > 50) {
+                if (displayFiles.length > 50) {
                     const more = document.createElement('div');
                     more.className = 'file-list-item';
                     more.style.fontStyle = 'italic';
-                    more.textContent = `... and ${this.files.length - 50} more files`;
+                    more.textContent = `... and ${displayFiles.length - 50} more files`;
                     fileList.appendChild(more);
                 }
             }
@@ -660,9 +674,94 @@
                 }
             }
 
+            cleanContent(content, extension) {
+                // Skip cleaning for certain types
+                if (['txt', 'md', 'json', 'csv'].includes(extension)) {
+                    return content;
+                }
+
+                let lines = content.split('\n');
+
+                // Remove comments
+                lines = lines.map(line => {
+                    line = line.trimEnd(); // Keep indentation, remove trailing space
+
+                    if (extension === 'js' || extension === 'ts' || extension === 'jsx' || extension === 'tsx' || extension === 'java' || extension === 'c' || extension === 'cpp' || extension === 'cs' || extension === 'go') {
+                        // Remove // comments
+                        const commentIndex = line.indexOf('//');
+                        if (commentIndex >= 0 && !this.isInsideString(line, commentIndex)) {
+                            line = line.slice(0, commentIndex);
+                        }
+                        // TODO: /* */ handling would require multi-line parsing — skip for simplicity
+                    } else if (extension === 'py' || extension === 'rb' || extension === 'sh' || extension === 'bash') {
+                        // Remove # comments
+                        const commentIndex = line.indexOf('#');
+                        if (commentIndex >= 0 && !this.isInsideString(line, commentIndex)) {
+                            line = line.slice(0, commentIndex);
+                        }
+                    } else if (extension === 'html' || extension === 'xml' || extension === 'xhtml') {
+                        // Remove <!-- --> comments (simplified)
+                        if (line.includes('<!--') && line.includes('-->')) {
+                            line = line.replace(/<!--[\s\S]*?-->/g, '');
+                        }
+                    } else if (extension === 'css' || extension === 'scss' || extension === 'less') {
+                        // Remove /* */ and // (in CSS /* is standard)
+                        if (line.includes('/*') && line.includes('*/')) {
+                            line = line.replace(/\/\*[\s\S]*?\*\//g, '');
+                        }
+                        const commentIndex = line.indexOf('//');
+                        if (commentIndex >= 0) {
+                            line = line.slice(0, commentIndex);
+                        }
+                    } else if (extension === 'sql') {
+                        // Remove -- and /* */ comments
+                        const commentIndex = line.indexOf('--');
+                        if (commentIndex >= 0) {
+                            line = line.slice(0, commentIndex);
+                        }
+                        if (line.includes('/*') && line.includes('*/')) {
+                            line = line.replace(/\/\*[\s\S]*?\*\//g, '');
+                        }
+                    }
+
+                    return line;
+                });
+
+                // Remove extra whitespace: collapse multiple empty lines into max 1
+                let cleaned = [];
+                let lastWasEmpty = false;
+
+                for (let line of lines) {
+                    if (line.trim() === '') {
+                        if (!lastWasEmpty) {
+                            cleaned.push('');
+                        }
+                        lastWasEmpty = true;
+                    } else {
+                        cleaned.push(line);
+                        lastWasEmpty = false;
+                    }
+                }
+
+                return cleaned.join('\n').trim();
+            }
+
+            // Helper: avoid removing // inside strings like "http://example.com"
+            isInsideString(line, index) {
+                let inSingle = false;
+                let inDouble = false;
+                for (let i = 0; i < index; i++) {
+                    if (line[i] === "'" && !inDouble) inSingle = !inSingle;
+                    if (line[i] === '"' && !inSingle) inDouble = !inDouble;
+                }
+                return inSingle || inDouble;
+            }
+
             async processFiles() {
                 const separator = document.getElementById('separator').value;
                 const outputName = document.getElementById('outputName').value || 'merged_files.txt';
+                const cleanMode = document.getElementById('cleanMode').checked;
+                const commonOnly = document.getElementById('commonOnly').checked;
 
                 const progressBar = document.getElementById('progressBar');
                 const progressFill = document.getElementById('progressFill');
@@ -673,8 +772,9 @@
                 processBtn.disabled = true;
                 this.showStatus('Merging files...', 'processing');
 
-                const filteredFiles = this.files.filter(file => {
+                let filteredFiles = this.files.filter(file => {
                     const extension = this.getFileExtension(file.name);
+                    if (commonOnly && !this.commonFileTypes.has(extension)) return false;
                     return this.selectedTypes.has(extension);
                 });
 
@@ -687,7 +787,13 @@
                     const fileSeparator = separator.replace('{filename}', displayName);
 
                     try {
-                        const content = await this.readFile(file);
+                        let content = await this.readFile(file);
+                        const extension = this.getFileExtension(file.name);
+
+                        if (cleanMode) {
+                            content = this.cleanContent(content, extension);
+                        }
+
                         mergedContent += fileSeparator + '\n' + content + '\n\n';
                     } catch (error) {
                         console.error(`Error reading file ${file.name}:`, error);

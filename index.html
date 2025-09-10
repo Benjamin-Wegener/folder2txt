@@ -350,7 +350,7 @@
     <div class="container">
         <div class="header">
             <h1>📁 Folder2Txt</h1>
-            <p>Drag & drop a folder — merge text, code, logs & more into one file</p>
+            <p>Drag & drop a folder — merge code, config, logs & more into one file</p>
         </div>
         
         <div class="content">
@@ -408,8 +408,26 @@
                 this.files = [];
                 this.selectedTypes = new Set();
                 this.commonTypes = new Set([
-                    'txt', 'js', 'html', 'css', 'json', 'md', 'py', 'java', 'cpp', 'c', 'h',
-                    'xml', 'yaml', 'yml', 'sql', 'sh', 'bat', 'csv', 'log', 'conf', 'ini', 'config'
+                    // Code
+                    'txt', 'js', 'jsx', 'ts', 'tsx', 'py', 'pyi', 'java', 'class', 'jar',
+                    'c', 'cpp', 'cxx', 'cc', 'h', 'hpp', 'cs', 'vb', 'fs', 'swift', 'kt', 'kts',
+                    'go', 'rs', 'rb', 'pl', 'pm', 'lua', 'r', 'scala', 'groovy', 'dart',
+                    
+                    // Web
+                    'html', 'htm', 'xhtml', 'css', 'scss', 'sass', 'less', 'vue', 'svelte',
+                    
+                    // Config & Data
+                    'json', 'jsonc', 'json5', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'config',
+                    'env', 'properties', 'gradle', 'makefile', 'dockerfile', 'gitignore', 'editorconfig',
+                    
+                    // Markup & Docs
+                    'md', 'markdown', 'rst', 'adoc', 'org', 'tex', 'latex',
+                    
+                    // Data & Logs
+                    'csv', 'tsv', 'log', 'sql', 'sqlite', 'db', 'xml', 'xsd', 'xsl', 'xslt',
+                    
+                    // Scripts
+                    'sh', 'bash', 'zsh', 'fish', 'ps1', 'bat', 'cmd', 'awk', 'sed'
                 ]);
                 this.mergedContent = '';
                 this.init();
@@ -504,6 +522,7 @@
                 }
 
                 Promise.all(promises).then(() => {
+                    this.autoSelectFoundTypes();
                     this.updateFileTypes();
                     this.updateProcessButton();
                     this.showStatus(`Found ${this.files.length} files`, 'success');
@@ -512,6 +531,7 @@
 
             handleFileInput(fileList) {
                 this.files = Array.from(fileList);
+                this.autoSelectFoundTypes();
                 this.updateFileTypes();
                 this.updateProcessButton();
                 this.showStatus(`Found ${this.files.length} files`, 'success');
@@ -545,6 +565,26 @@
                         this.files.push(file);
                     }
                 });
+            }
+
+            autoSelectFoundTypes() {
+                const foundTypes = new Set();
+                this.files.forEach(file => {
+                    const ext = this.getFileExtension(file.name);
+                    if (ext) foundTypes.add(ext);
+                });
+
+                // Auto-enable any found file type
+                foundTypes.forEach(type => {
+                    this.selectedTypes.add(type);
+                    const checkbox = document.getElementById(`type-${type}`);
+                    if (checkbox) checkbox.checked = true;
+                });
+
+                // Always ensure .txt is selected
+                this.selectedTypes.add('txt');
+                const txtCheckbox = document.getElementById('type-txt');
+                if (txtCheckbox) txtCheckbox.checked = true;
             }
 
             updateFileTypes() {

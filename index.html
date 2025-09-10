@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folder to Text Merger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .drop-zone {
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #fafafa;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .drop-zone.drag-over {
+            border-color: #667eea;
+            background: #f0f4ff;
+            transform: scale(1.02);
+        }
+
+        .drop-zone-content {
+            pointer-events: none;
+        }
+
+        .drop-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            color: #ddd;
+            transition: color 0.3s ease;
+        }
+
+        .drop-zone.drag-over .drop-icon {
+            color: #667eea;
+        }
+
+        .drop-text {
+            font-size: 1.3em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .drop-hint {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .browse-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .browse-btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .file-types {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .file-type-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .file-type-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-type-item:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .file-type-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .file-type-item label {
+            cursor: pointer;
+            font-weight: 500;
+            color: #495057;
+            flex: 1;
+        }
+
+        .file-count {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .options {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .option-item {
+            margin-bottom: 20px;
+        }
+
+        .option-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .option-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .option-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .option-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-option input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        .process-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .process-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .process-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status.processing {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .file-list-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .file-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .processing .drop-icon {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📁 Folder to Text Merger</h1>
+            <p>Drag & drop a folder, select file types, and merge them into a single text file</p>
+        </div>
+        
+        <div class="content">
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-content">
+                    <div class="drop-icon">📂</div>
+                    <div class="drop-text">Drag & Drop a folder here</div>
+                    <div class="drop-hint">or click to browse</div>
+                    <input type="file" id="fileInput" class="file-input" webkitdirectory directory multiple>
+                    <label for="fileInput" class="browse-btn">Browse Folder</label>
+                </div>
+            </div>
+
+            <div class="file-types">
+                <h3 class="section-title">Select File Types to Include</h3>
+                <div class="file-type-grid" id="fileTypeGrid">
+                    <!-- File types will be populated here -->
+                </div>
+            </div>
+
+            <div class="options">
+                <h3 class="section-title">Options</h3>
+                <div class="option-item">
+                    <label class="option-label" for="separator">File Separator</label>
+                    <input type="text" id="separator" class="option-input" value="--- {filename} ---" placeholder="--- {filename} ---">
+                </div>
+                <div class="option-item">
+                    <label class="option-label" for="outputName">Output Filename</label>
+                    <input type="text" id="outputName" class="option-input" value="merged_files.txt" placeholder="merged_files.txt">
+                </div>
+                <div class="checkbox-option">
+                    <input type="checkbox" id="includePath" checked>
+                    <label for="includePath">Include relative path in filename</label>
+                </div>
+                <div class="checkbox-option">
+                    <input type="checkbox" id="addNumbers" checked>
+                    <label for="addNumbers">Add file numbers</label>
+                </div>
+            </div>
+
+            <div class="status" id="status"></div>
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <button class="process-btn" id="processBtn" disabled>Process Files</button>
+
+            <div class="file-list" id="fileList"></div>
+        </div>
+    </div>
+
+    <script>
+        class FolderTextMerger {
+            constructor() {
+                this.files = [];
+                this.selectedTypes = new Set();
+                this.commonTypes = new Set(['txt', 'js', 'html', 'css', 'json', 'md', 'py', 'java', 'cpp', 'c', 'h', 'xml', 'yaml', 'yml', 'sql', 'sh', 'bat', 'csv', 'log', 'conf', 'ini', 'config']);
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.populateFileTypes();
+            }
+
+            setupEventListeners() {
+                const dropZone = document.getElementById('dropZone');
+                const fileInput = document.getElementById('fileInput');
+                const processBtn = document.getElementById('processBtn');
+
+                // Drag and drop events
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('drag-over');
+                });
+
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('drag-over');
+                });
+
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('drag-over');
+                    this.handleFiles(e.dataTransfer.items);
+                });
+
+                // File input change
+                fileInput.addEventListener('change', (e) => {
+                    this.handleFileInput(e.target.files);
+                });
+
+                // Process button
+                processBtn.addEventListener('click', () => {
+                    this.processFiles();
+                });
+            }
+
+            populateFileTypes() {
+                const grid = document.getElementById('fileTypeGrid');
+                const types = Array.from(this.commonTypes).sort();
+                
+                types.forEach(type => {
+                    const item = document.createElement('div');
+                    item.className = 'file-type-item';
+                    item.innerHTML = `
+                        <input type="checkbox" id="type-${type}" value="${type}">
+                        <label for="type-${type}">.${type}</label>
+                        <span class="file-count" id="count-${type}">0</span>
+                    `;
+                    
+                    const checkbox = item.querySelector('input');
+                    checkbox.addEventListener('change', (e) => {
+                        if (e.target.checked) {
+                            this.selectedTypes.add(type);
+                        } else {
+                            this.selectedTypes.delete(type);
+                        }
+                        this.updateProcessButton();
+                    });
+                    
+                    grid.appendChild(item);
+                });
+            }
+
+            handleFiles(items) {
+                this.files = [];
+                const promises = [];
+
+                for (let item of items) {
+                    if (item.kind === 'file') {
+                        const entry = item.webkitGetAsEntry();
+                        if (entry) {
+                            promises.push(this.traverseFileTree(entry));
+                        }
+                    }
+                }
+
+                Promise.all(promises).then(() => {
+                    this.updateFileTypes();
+                    this.updateProcessButton();
+                    this.showStatus(`Found ${this.files.length} files`, 'success');
+                });
+            }
+
+            handleFileInput(fileList) {
+                this.files = Array.from(fileList);
+                this.updateFileTypes();
+                this.updateProcessButton();
+                this.showStatus(`Found ${this.files.length} files`, 'success');
+            }
+
+            traverseFileTree(item, path = '') {
+                return new Promise((resolve) => {
+                    if (item.isFile) {
+                        item.file(resolve);
+                    } else if (item.isDirectory) {
+                        const dirReader = item.createReader();
+                        const readEntries = () => {
+                            dirReader.readEntries((entries) => {
+                                if (entries.length === 0) {
+                                    resolve();
+                                } else {
+                                    const promises = entries.map(entry => 
+                                        this.traverseFileTree(entry, path + item.name + '/')
+                                    );
+                                    Promise.all(promises).then(() => readEntries());
+                                }
+                            });
+                        };
+                        readEntries();
+                    } else {
+                        resolve();
+                    }
+                }).then((file) => {
+                    if (file) {
+                        file.relativePath = path + file.name;
+                        this.files.push(file);
+                    }
+                });
+            }
+
+            updateFileTypes() {
+                const typeCounts = {};
+                
+                this.files.forEach(file => {
+                    const extension = this.getFileExtension(file.name);
+                    if (extension) {
+                        typeCounts[extension] = (typeCounts[extension] || 0) + 1;
+                    }
+                });
+
+                // Update counts
+                Object.keys(typeCounts).forEach(type => {
+                    const countElement = document.getElementById(`count-${type}`);
+                    if (countElement) {
+                        countElement.textContent = typeCounts[type];
+                    }
+                });
+
+                // Show file list
+                this.showFileList();
+            }
+
+            showFileList() {
+                const fileList = document.getElementById('fileList');
+                fileList.style.display = 'block';
+                fileList.innerHTML = '<h4 style="margin-bottom: 15px;">Files Found:</h4>';
+                
+                this.files.slice(0, 50).forEach(file => {
+                    const item = document.createElement('div');
+                    item.className = 'file-list-item';
+                    item.textContent = file.relativePath || file.name;
+                    fileList.appendChild(item);
+                });
+
+                if (this.files.length > 50) {
+                    const more = document.createElement('div');
+                    more.className = 'file-list-item';
+                    more.style.fontStyle = 'italic';
+                    more.textContent = `... and ${this.files.length - 50} more files`;
+                    fileList.appendChild(more);
+                }
+            }
+
+            getFileExtension(filename) {
+                const parts = filename.split('.');
+                return parts.length > 1 ? parts.pop().toLowerCase() : '';
+            }
+
+            updateProcessButton() {
+                const processBtn = document.getElementById('processBtn');
+                const hasFiles = this.files.length > 0;
+                const hasSelectedTypes = this.selectedTypes.size > 0;
+                
+                processBtn.disabled = !(hasFiles && hasSelectedTypes);
+            }
+
+            showStatus(message, type) {
+                const status = document.getElementById('status');
+                status.className = `status ${type}`;
+                status.textContent = message;
+                status.style.display = 'block';
+                
+                if (type === 'success' || type === 'error') {
+                    setTimeout(() => {
+                        status.style.display = 'none';
+                    }, 5000);
+                }
+            }
+
+            async processFiles() {
+                const separator = document.getElementById('separator').value;
+                const outputName = document.getElementById('outputName').value || 'merged_files.txt';
+                const includePath = document.getElementById('includePath').checked;
+                const addNumbers = document.getElementById('addNumbers').checked;
+                
+                const progressBar = document.getElementById('progressBar');
+                const progressFill = document.getElementById('progressFill');
+                const processBtn = document.getElementById('processBtn');
+                
+                progressBar.style.display = 'block';
+                processBtn.disabled = true;
+                this.showStatus('Processing files...', 'processing');
+                
+                const filteredFiles = this.files.filter(file => {
+                    const extension = this.getFileExtension(file.name);
+                    return this.selectedTypes.has(extension);
+                });
+
+                let mergedContent = '';
+                let processed = 0;
+
+                for (let i = 0; i < filteredFiles.length; i++) {
+                    const file = filteredFiles[i];
+                    const displayName = includePath ? (file.relativePath || file.name) : file.name;
+                    const fileNumber = addNumbers ? `[${i + 1}] ` : '';
+                    const fileSeparator = separator.replace('{filename}', fileNumber + displayName);
+                    
+                    try {
+                        const content = await this.readFile(file);
+                        mergedContent += fileSeparator + '\n' + content + '\n\n';
+                    } catch (error) {
+                        console.error(`Error reading file ${file.name}:`, error);
+                        mergedContent += fileSeparator + '\n[Error reading file]\n\n';
+                    }
+                    
+                    processed++;
+                    const progress = (processed / filteredFiles.length) * 100;
+                    progressFill.style.width = progress + '%';
+                }
+
+                // Download the merged file
+                this.downloadFile(mergedContent, outputName);
+                
+                this.showStatus(`Successfully merged ${filteredFiles.length} files!`, 'success');
+                progressBar.style.display = 'none';
+                processBtn.disabled = false;
+            }
+
+            readFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsText(file);
+                });
+            }
+
+            downloadFile(content, filename) {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        // Initialize the application
+        new FolderTextMerger();
+    </script>
+</body>
+</html>

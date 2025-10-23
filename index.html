@@ -351,6 +351,27 @@
             animation: pulse 1.5s infinite;
         }
 
+        .file-type-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .file-type-controls button {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-type-controls button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
         @media (max-width: 600px) {
             .file-type-grid {
                 grid-template-columns: repeat(3, 1fr);
@@ -378,6 +399,10 @@
 
             <div class="file-types">
                 <h3 class="section-title">Select File Types to Include</h3>
+                <div class="file-type-controls">
+                    <button id="selectAllBtn">Select All</button>
+                    <button id="deselectAllBtn">Deselect All</button>
+                </div>
                 <div class="file-type-grid" id="fileTypeGrid">
                     <p id="noFilesHint" style="grid-column: 1 / -1; text-align: center; color: #888; padding: 20px;">
                         Upload a folder to see detected file types.
@@ -401,7 +426,7 @@
                 </div>
                 <div class="checkbox-option">
                     <input type="checkbox" id="commonOnly">
-                    <label for="commonOnly">📦 Common File Types Only (.txt, .js, .py, .json, .md, .html, .css, .yml, .xml, .sql)</label>
+                    <label for="commonOnly">📦 Common File Types Only (.txt, .js, .py, .json, .md, .html, .css, .yml, .xml, .sql, .gradle, .kt)</label>
                 </div>
             </div>
 
@@ -431,7 +456,7 @@
                 this.selectedTypes = new Set();
                 this.mergedContent = '';
                 this.commonFileTypes = new Set([
-                    'txt', 'js', 'py', 'json', 'md', 'html', 'htm', 'css', 'yaml', 'yml', 'xml', 'sql'
+                    'txt', 'js', 'py', 'json', 'md', 'html', 'htm', 'css', 'yaml', 'yml', 'xml', 'sql', 'gradle', 'kt'
                 ]);
                 this.init();
             }
@@ -484,6 +509,12 @@
                         this.renderFoundFileTypes();
                     }
                 });
+
+                // Select All and Deselect All buttons
+                const selectAllBtn = document.getElementById('selectAllBtn');
+                const deselectAllBtn = document.getElementById('deselectAllBtn');
+                selectAllBtn.addEventListener('click', () => this.selectAllTypes());
+                deselectAllBtn.addEventListener('click', () => this.deselectAllTypes());
             }
 
             handleFiles(items) {
@@ -558,7 +589,7 @@
                 }
 
                 // Collect found extensions
-                const foundTypes = new Set();
+                const foundTypes = commonOnly ? new Set(this.commonFileTypes) : new Set();
                 const typeCounts = {};
 
                 let filteredFiles = this.files;
@@ -572,7 +603,7 @@
 
                 filteredFiles.forEach(file => {
                     const ext = this.getFileExtension(file.name);
-                    if (ext) {
+                    if (ext && (commonOnly ? this.commonFileTypes.has(ext) : true)) {
                         foundTypes.add(ext);
                         typeCounts[ext] = (typeCounts[ext] || 0) + 1;
                     }
@@ -848,6 +879,24 @@
                         this.showStatus('❌ Failed to copy', 'error');
                         console.error('Copy failed:', err);
                     });
+            }
+
+            selectAllTypes() {
+                const checkboxes = document.querySelectorAll('#fileTypeGrid input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    cb.checked = true;
+                    this.selectedTypes.add(cb.value);
+                });
+                this.updateProcessButton();
+            }
+
+            deselectAllTypes() {
+                const checkboxes = document.querySelectorAll('#fileTypeGrid input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    cb.checked = false;
+                    this.selectedTypes.delete(cb.value);
+                });
+                this.updateProcessButton();
             }
         }
 

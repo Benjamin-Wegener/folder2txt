@@ -449,459 +449,450 @@
         </div>
     </div>
 
-    <script>
-        class FolderTextMerger {
-            constructor() {
-                this.files = [];
-                this.selectedTypes = new Set();
-                this.mergedContent = '';
-                this.commonFileTypes = new Set([
-                    'txt', 'js', 'py', 'json', 'md', 'html', 'htm', 'css', 'yaml', 'yml', 'xml', 'sql', 'gradle', 'kt'
-                ]);
-                this.init();
-            }
-
-            init() {
-                this.setupEventListeners();
-            }
-
-            setupEventListeners() {
-                const dropZone = document.getElementById('dropZone');
-                const fileInput = document.getElementById('fileInput');
-                const processBtn = document.getElementById('processBtn');
-                const copyBtn = document.getElementById('copyBtn');
-                const commonOnlyCheckbox = document.getElementById('commonOnly');
-
-                // Drag and drop events
-                dropZone.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.add('drag-over');
-                });
-
-                dropZone.addEventListener('dragleave', () => {
-                    dropZone.classList.remove('drag-over');
-                });
-
-                dropZone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('drag-over');
-                    this.handleFiles(e.dataTransfer.items);
-                });
-
-                // File input change
-                fileInput.addEventListener('change', (e) => {
-                    this.handleFileInput(e.target.files);
-                });
-
-                // Process button
-                processBtn.addEventListener('click', () => {
-                    this.processFiles();
-                });
-
-                // Copy button
-                copyBtn.addEventListener('click', () => {
-                    this.copyToClipboard();
-                });
-
-                // Common Only toggle — re-filter on change
-                commonOnlyCheckbox.addEventListener('change', () => {
-                    if (this.files.length > 0) {
-                        this.renderFoundFileTypes();
-                    }
-                });
-
-                // Select All and Deselect All buttons
-                const selectAllBtn = document.getElementById('selectAllBtn');
-                const deselectAllBtn = document.getElementById('deselectAllBtn');
-                selectAllBtn.addEventListener('click', () => this.selectAllTypes());
-                deselectAllBtn.addEventListener('click', () => this.deselectAllTypes());
-            }
-
-            handleFiles(items) {
-                this.files = [];
-                const promises = [];
-
-                for (let item of items) {
-                    if (item.kind === 'file') {
-                        const entry = item.webkitGetAsEntry();
-                        if (entry) {
-                            promises.push(this.traverseFileTree(entry));
-                        }
-                    }
-                }
-
-                Promise.all(promises).then(() => {
-                    this.renderFoundFileTypes();
-                    this.updateProcessButton();
-                    this.showStatus(`Found ${this.files.length} files`, 'success');
-                });
-            }
-
-            handleFileInput(fileList) {
-                this.files = Array.from(fileList);
-                this.renderFoundFileTypes();
-                this.updateProcessButton();
-                this.showStatus(`Found ${this.files.length} files`, 'success');
-            }
-
-            traverseFileTree(item, path = '') {
-                return new Promise((resolve) => {
-                    if (item.isFile) {
-                        item.file(resolve);
-                    } else if (item.isDirectory) {
-                        const dirReader = item.createReader();
-                        const readEntries = () => {
-                            dirReader.readEntries((entries) => {
-                                if (entries.length === 0) {
-                                    resolve();
-                                } else {
-                                    const promises = entries.map(entry => 
-                                        this.traverseFileTree(entry, path + item.name + '/')
-                                    );
-                                    Promise.all(promises).then(() => readEntries());
-                                }
-                            });
-                        };
-                        readEntries();
-                    } else {
-                        resolve();
-                    }
-                }).then((file) => {
-                    if (file) {
-                        file.relativePath = path + file.name;
-                        this.files.push(file);
-                    }
-                });
-            }
-
-            renderFoundFileTypes() {
-                const grid = document.getElementById('fileTypeGrid');
-                const noFilesHint = document.getElementById('noFilesHint');
-                const commonOnly = document.getElementById('commonOnly').checked;
-
-                // Clear previous
-                grid.innerHTML = '';
-                this.selectedTypes.clear();
-
-                if (this.files.length === 0) {
-                    if (noFilesHint) grid.appendChild(noFilesHint);
-                    return;
-                }
-
-                // Collect found extensions
-                const foundTypes = commonOnly ? new Set(this.commonFileTypes) : new Set();
-                const typeCounts = {};
-
-                let filteredFiles = this.files;
-
-                if (commonOnly) {
-                    filteredFiles = this.files.filter(file => {
-                        const ext = this.getFileExtension(file.name);
-                        return this.commonFileTypes.has(ext);
-                    });
-                }
-
-                filteredFiles.forEach(file => {
-                    const ext = this.getFileExtension(file.name);
-                    if (ext && (commonOnly ? this.commonFileTypes.has(ext) : true)) {
-                        foundTypes.add(ext);
-                        typeCounts[ext] = (typeCounts[ext] || 0) + 1;
-                    }
-                });
-
-                // If nothing found, fallback to .txt
-                if (foundTypes.size === 0) {
-                    foundTypes.add('txt');
-                    typeCounts['txt'] = 0;
-                }
-
-                // Render checkboxes for found types
-                Array.from(foundTypes).sort().forEach(type => {
-                    const item = document.createElement('div');
-                    item.className = 'file-type-item';
-                    item.innerHTML = `
-                        <input type="checkbox" id="type-${type}" value="${type}" checked>
-                        <label for="type-${type}">.${type}</label>
-                        <span class="file-count" id="count-${type}">${typeCounts[type] || 0}</span>
-                    `;
-
-                    const checkbox = item.querySelector('input');
-                    checkbox.addEventListener('change', (e) => {
-                        if (e.target.checked) {
-                            this.selectedTypes.add(type);
-                        } else {
-                            this.selectedTypes.delete(type);
-                        }
-                        this.updateProcessButton();
-                    });
-
-                    // Auto-add to selected
-                    this.selectedTypes.add(type);
-
-                    grid.appendChild(item);
-                });
-
-                this.showFileList();
-            }
-
-            showFileList() {
-                const fileList = document.getElementById('fileList');
-                if (this.files.length === 0) {
-                    fileList.style.display = 'none';
-                    return;
-                }
-                fileList.style.display = 'block';
-                fileList.innerHTML = '<h4 style="margin-bottom: 15px;">Files Found:</h4>';
-
-                const commonOnly = document.getElementById('commonOnly').checked;
-                let displayFiles = this.files;
-
-                if (commonOnly) {
-                    displayFiles = this.files.filter(file => {
-                        const ext = this.getFileExtension(file.name);
-                        return this.commonFileTypes.has(ext);
-                    });
-                }
-
-                displayFiles.slice(0, 50).forEach(file => {
-                    const item = document.createElement('div');
-                    item.className = 'file-list-item';
-                    item.textContent = file.relativePath || file.name;
-                    fileList.appendChild(item);
-                });
-
-                if (displayFiles.length > 50) {
-                    const more = document.createElement('div');
-                    more.className = 'file-list-item';
-                    more.style.fontStyle = 'italic';
-                    more.textContent = `... and ${displayFiles.length - 50} more files`;
-                    fileList.appendChild(more);
-                }
-            }
-
-            getFileExtension(filename) {
-                const parts = filename.split('.');
-                return parts.length > 1 ? parts.pop().toLowerCase() : '';
-            }
-
-            updateProcessButton() {
-                const processBtn = document.getElementById('processBtn');
-                const hasFiles = this.files.length > 0;
-                const hasSelectedTypes = this.selectedTypes.size > 0;
-
-                processBtn.disabled = !(hasFiles && hasSelectedTypes);
-            }
-
-            showStatus(message, type) {
-                const status = document.getElementById('status');
-                status.className = `status ${type}`;
-                status.textContent = message;
-                status.style.display = 'block';
-
-                if (type === 'success' || type === 'error') {
-                    setTimeout(() => {
-                        status.style.display = 'none';
-                    }, 5000);
-                }
-            }
-
-            cleanContent(content, extension) {
-                // Skip cleaning for certain types
-                if (['txt', 'md', 'json', 'csv'].includes(extension)) {
-                    return content;
-                }
-
-                let lines = content.split('\n');
-
-                // Remove comments
-                lines = lines.map(line => {
-                    line = line.trimEnd(); // Keep indentation, remove trailing space
-
-                    if (extension === 'js' || extension === 'ts' || extension === 'jsx' || extension === 'tsx' || extension === 'java' || extension === 'c' || extension === 'cpp' || extension === 'cs' || extension === 'go') {
-                        // Remove // comments
-                        const commentIndex = line.indexOf('//');
-                        if (commentIndex >= 0 && !this.isInsideString(line, commentIndex)) {
-                            line = line.slice(0, commentIndex);
-                        }
-                        // TODO: /* */ handling would require multi-line parsing — skip for simplicity
-                    } else if (extension === 'py' || extension === 'rb' || extension === 'sh' || extension === 'bash') {
-                        // Remove # comments
-                        const commentIndex = line.indexOf('#');
-                        if (commentIndex >= 0 && !this.isInsideString(line, commentIndex)) {
-                            line = line.slice(0, commentIndex);
-                        }
-                    } else if (extension === 'html' || extension === 'xml' || extension === 'xhtml') {
-                        // Remove <!-- --> comments (simplified)
-                        if (line.includes('<!--') && line.includes('-->')) {
-                            line = line.replace(/<!--[\s\S]*?-->/g, '');
-                        }
-                    } else if (extension === 'css' || extension === 'scss' || extension === 'less') {
-                        // Remove /* */ and // (in CSS /* is standard)
-                        if (line.includes('/*') && line.includes('*/')) {
-                            line = line.replace(/\/\*[\s\S]*?\*\//g, '');
-                        }
-                        const commentIndex = line.indexOf('//');
-                        if (commentIndex >= 0) {
-                            line = line.slice(0, commentIndex);
-                        }
-                    } else if (extension === 'sql') {
-                        // Remove -- and /* */ comments
-                        const commentIndex = line.indexOf('--');
-                        if (commentIndex >= 0) {
-                            line = line.slice(0, commentIndex);
-                        }
-                        if (line.includes('/*') && line.includes('*/')) {
-                            line = line.replace(/\/\*[\s\S]*?\*\//g, '');
-                        }
-                    }
-
-                    return line;
-                });
-
-                // Remove extra whitespace: collapse multiple empty lines into max 1
-                let cleaned = [];
-                let lastWasEmpty = false;
-
-                for (let line of lines) {
-                    if (line.trim() === '') {
-                        if (!lastWasEmpty) {
-                            cleaned.push('');
-                        }
-                        lastWasEmpty = true;
-                    } else {
-                        cleaned.push(line);
-                        lastWasEmpty = false;
-                    }
-                }
-
-                return cleaned.join('\n').trim();
-            }
-
-            // Helper: avoid removing // inside strings like "http://example.com"
-            isInsideString(line, index) {
-                let inSingle = false;
-                let inDouble = false;
-                for (let i = 0; i < index; i++) {
-                    if (line[i] === "'" && !inDouble) inSingle = !inSingle;
-                    if (line[i] === '"' && !inSingle) inDouble = !inDouble;
-                }
-                return inSingle || inDouble;
-            }
-
-            async processFiles() {
-                const separator = document.getElementById('separator').value;
-                const outputName = document.getElementById('outputName').value || 'merged_files.txt';
-                const cleanMode = document.getElementById('cleanMode').checked;
-                const commonOnly = document.getElementById('commonOnly').checked;
-
-                const progressBar = document.getElementById('progressBar');
-                const progressFill = document.getElementById('progressFill');
-                const processBtn = document.getElementById('processBtn');
-                const copyBtn = document.getElementById('copyBtn');
-
-                progressBar.style.display = 'block';
-                processBtn.disabled = true;
-                this.showStatus('Merging files...', 'processing');
-
-                let filteredFiles = this.files.filter(file => {
-                    const extension = this.getFileExtension(file.name);
-                    if (commonOnly && !this.commonFileTypes.has(extension)) return false;
-                    return this.selectedTypes.has(extension);
-                });
-
-                let mergedContent = '';
-                let processed = 0;
-
-                for (let i = 0; i < filteredFiles.length; i++) {
-                    const file = filteredFiles[i];
-                    const displayName = file.relativePath || file.name;
-                    const fileSeparator = separator.replace('{filename}', displayName);
-
-                    try {
-                        let content = await this.readFile(file);
-                        const extension = this.getFileExtension(file.name);
-
-                        if (cleanMode) {
-                            content = this.cleanContent(content, extension);
-                        }
-
-                        mergedContent += fileSeparator + '\n' + content + '\n\n';
-                    } catch (error) {
-                        console.error(`Error reading file ${file.name}:`, error);
-                        mergedContent += fileSeparator + '\n[Error reading file]\n\n';
-                    }
-
-                    processed++;
-                    const progress = (processed / filteredFiles.length) * 100;
-                    progressFill.style.width = progress + '%';
-                }
-
-                this.mergedContent = mergedContent;
-
-                // Show copy button
-                copyBtn.style.display = 'block';
-
-                // Download the merged file
-                this.downloadFile(mergedContent, outputName);
-
-                this.showStatus(`✅ Merged ${filteredFiles.length} files!`, 'success');
-                progressBar.style.display = 'none';
-                processBtn.disabled = false;
-            }
-
-            readFile(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = e => resolve(e.target.result);
-                    reader.onerror = reject;
-                    reader.readAsText(file);
-                });
-            }
-
-            downloadFile(content, filename) {
-                const blob = new Blob([content], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
-
-            copyToClipboard() {
-                navigator.clipboard.writeText(this.mergedContent)
-                    .then(() => {
-                        this.showStatus('📋 Copied to clipboard!', 'success');
-                    })
-                    .catch(err => {
-                        this.showStatus('❌ Failed to copy', 'error');
-                        console.error('Copy failed:', err);
-                    });
-            }
-
-            selectAllTypes() {
-                const checkboxes = document.querySelectorAll('#fileTypeGrid input[type="checkbox"]');
-                checkboxes.forEach(cb => {
-                    cb.checked = true;
-                    this.selectedTypes.add(cb.value);
-                });
-                this.updateProcessButton();
-            }
-
-            deselectAllTypes() {
-                const checkboxes = document.querySelectorAll('#fileTypeGrid input[type="checkbox"]');
-                checkboxes.forEach(cb => {
-                    cb.checked = false;
-                    this.selectedTypes.delete(cb.value);
-                });
-                this.updateProcessButton();
-            }
+<script>
+class FolderTextMerger {
+  constructor() {
+    this.files = [];
+    this.selectedTypes = new Set();
+    this.mergedContent = '';
+    this.commonFileTypes = new Set([
+      'txt', 'js', 'py', 'json', 'md', 'html', 'htm', 'css',
+      'yaml', 'yml', 'xml', 'sql', 'gradle', 'kt'
+    ]);
+    this.init();
+  }
+
+  init() {
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const processBtn = document.getElementById('processBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const commonOnlyCheckbox = document.getElementById('commonOnly');
+
+    // Drag and drop events
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      this.handleDrop(e.dataTransfer);
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+      this.handleFileInput(e.target.files);
+    });
+
+    // Process button
+    processBtn.addEventListener('click', () => {
+      this.processFiles();
+    });
+
+    // Copy button
+    copyBtn.addEventListener('click', () => {
+      this.copyToClipboard();
+    });
+
+    // Common Only toggle — re-filter on change
+    commonOnlyCheckbox.addEventListener('change', () => {
+      if (this.files.length > 0) {
+        this.renderFoundFileTypes();
+      }
+    });
+
+    // Select All and Deselect All buttons
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
+    selectAllBtn.addEventListener('click', () => this.selectAllTypes());
+    deselectAllBtn.addEventListener('click', () => this.deselectAllTypes());
+  }
+
+  // Neuer zentraler Handler für Drop
+  handleDrop(dataTransfer) {
+    this.files = [];
+    const items = dataTransfer.items;
+    const promises = [];
+
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      // Chrome / Edge mit Ordner-Support
+      for (let item of items) {
+        if (item.kind === 'file') {
+          const entry = item.webkitGetAsEntry();
+          if (entry) {
+            promises.push(this.traverseFileTree(entry));
+          }
         }
+      }
 
-        // Initialize the application
-        new FolderTextMerger();
-    </script>
+      Promise.all(promises).then(() => {
+        this.afterFilesCollected();
+      });
+    } else {
+      // Fallback: Firefox, oder Chrome ohne webkitGetAsEntry → normale Files
+      this.files = Array.from(dataTransfer.files || []);
+      this.afterFilesCollected();
+    }
+  }
+
+  handleFileInput(fileList) {
+    this.files = Array.from(fileList);
+    this.afterFilesCollected();
+  }
+
+  afterFilesCollected() {
+    this.renderFoundFileTypes();
+    this.updateProcessButton();
+    this.showStatus(`Found ${this.files.length} files`, 'success');
+  }
+
+  traverseFileTree(item, path = '') {
+    return new Promise((resolve) => {
+      if (item.isFile) {
+        item.file(resolve);
+      } else if (item.isDirectory) {
+        const dirReader = item.createReader();
+        const readEntries = () => {
+          dirReader.readEntries((entries) => {
+            if (entries.length === 0) {
+              resolve();
+            } else {
+              const promises = entries.map((entry) =>
+                this.traverseFileTree(entry, path + item.name + '/')
+              );
+              Promise.all(promises).then(() => readEntries());
+            }
+          });
+        };
+        readEntries();
+      } else {
+        resolve();
+      }
+    }).then((file) => {
+      if (file) {
+        file.relativePath = path + file.name;
+        this.files.push(file);
+      }
+    });
+  }
+
+  renderFoundFileTypes() {
+    const grid = document.getElementById('fileTypeGrid');
+    const noFilesHint = document.getElementById('noFilesHint');
+    const commonOnly = document.getElementById('commonOnly').checked;
+
+    grid.innerHTML = '';
+    this.selectedTypes.clear();
+
+    if (this.files.length === 0) {
+      if (noFilesHint) grid.appendChild(noFilesHint);
+      return;
+    }
+
+    const foundTypes = commonOnly ? new Set(this.commonFileTypes) : new Set();
+    const typeCounts = {};
+    let filteredFiles = this.files;
+
+    if (commonOnly) {
+      filteredFiles = this.files.filter((file) => {
+        const ext = this.getFileExtension(file.name);
+        return this.commonFileTypes.has(ext);
+      });
+    }
+
+    filteredFiles.forEach((file) => {
+      const ext = this.getFileExtension(file.name);
+      if (ext && (commonOnly ? this.commonFileTypes.has(ext) : true)) {
+        foundTypes.add(ext);
+        typeCounts[ext] = (typeCounts[ext] || 0) + 1;
+      }
+    });
+
+    if (foundTypes.size === 0) {
+      foundTypes.add('txt');
+      typeCounts['txt'] = 0;
+    }
+
+    Array.from(foundTypes)
+      .sort()
+      .forEach((type) => {
+        const item = document.createElement('div');
+        item.className = 'file-type-item';
+        item.innerHTML = `
+          <input type="checkbox" id="type-${type}" value="${type}" checked>
+          <label for="type-${type}">.${type}</label>
+          <span class="file-count" id="count-${type}">${typeCounts[type] || 0}</span>
+        `;
+        const checkbox = item.querySelector('input');
+        checkbox.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            this.selectedTypes.add(type);
+          } else {
+            this.selectedTypes.delete(type);
+          }
+          this.updateProcessButton();
+        });
+        this.selectedTypes.add(type);
+        grid.appendChild(item);
+      });
+
+    this.showFileList();
+  }
+
+  showFileList() {
+    const fileList = document.getElementById('fileList');
+    if (this.files.length === 0) {
+      fileList.style.display = 'none';
+      return;
+    }
+    fileList.style.display = 'block';
+    fileList.innerHTML = '<h4 style="margin-bottom: 15px;">Files Found:</h4>';
+
+    const commonOnly = document.getElementById('commonOnly').checked;
+    let displayFiles = this.files;
+
+    if (commonOnly) {
+      displayFiles = this.files.filter((file) => {
+        const ext = this.getFileExtension(file.name);
+        return this.commonFileTypes.has(ext);
+      });
+    }
+
+    displayFiles.slice(0, 50).forEach((file) => {
+      const item = document.createElement('div');
+      item.className = 'file-list-item';
+      item.textContent = file.relativePath || file.name;
+      fileList.appendChild(item);
+    });
+
+    if (displayFiles.length > 50) {
+      const more = document.createElement('div');
+      more.className = 'file-list-item';
+      more.style.fontStyle = 'italic';
+      more.textContent = `... and ${displayFiles.length - 50} more files`;
+      fileList.appendChild(more);
+    }
+  }
+
+  getFileExtension(filename) {
+    const parts = filename.split('.');
+    return parts.length > 1 ? parts.pop().toLowerCase() : '';
+  }
+
+  updateProcessButton() {
+    const processBtn = document.getElementById('processBtn');
+    const hasFiles = this.files.length > 0;
+    const hasSelectedTypes = this.selectedTypes.size > 0;
+    processBtn.disabled = !(hasFiles && hasSelectedTypes);
+  }
+
+  showStatus(message, type) {
+    const status = document.getElementById('status');
+    status.className = `status ${type}`;
+    status.textContent = message;
+    status.style.display = 'block';
+    if (type === 'success' || type === 'error') {
+      setTimeout(() => {
+        status.style.display = 'none';
+      }, 5000);
+    }
+  }
+
+  cleanContent(content, extension) {
+    if (['txt', 'md', 'json', 'csv'].includes(extension)) {
+      return content;
+    }
+
+    let lines = content.split('\n');
+
+    lines = lines.map((line) => {
+      line = line.trimEnd();
+
+      if (['js', 'ts', 'jsx', 'tsx', 'java', 'c', 'cpp', 'cs', 'go'].includes(extension)) {
+        const commentIndex = line.indexOf('//');
+        if (commentIndex >= 0 && !this.isInsideString(line, commentIndex)) {
+          line = line.slice(0, commentIndex);
+        }
+      } else if (['py', 'rb', 'sh', 'bash'].includes(extension)) {
+        const commentIndex = line.indexOf('#');
+        if (commentIndex >= 0 && !this.isInsideString(line, commentIndex)) {
+          line = line.slice(0, commentIndex);
+        }
+      } else if (['html', 'xml', 'xhtml'].includes(extension)) {
+        if (line.includes('<!--') && line.includes('-->')) {
+          line = line.replace(/<!--[\s\S]*?-->/g, '');
+        }
+      } else if (['css', 'scss', 'less'].includes(extension)) {
+        if (line.includes('/*') && line.includes('*/')) {
+          line = line.replace(/\/\*[\s\S]*?\*\//g, '');
+        }
+        const commentIndex = line.indexOf('//');
+        if (commentIndex >= 0) {
+          line = line.slice(0, commentIndex);
+        }
+      } else if (extension === 'sql') {
+        const commentIndex = line.indexOf('--');
+        if (commentIndex >= 0) {
+          line = line.slice(0, commentIndex);
+        }
+        if (line.includes('/*') && line.includes('*/')) {
+          line = line.replace(/\/\*[\s\S]*?\*\//g, '');
+        }
+      }
+
+      return line;
+    });
+
+    let cleaned = [];
+    let lastWasEmpty = false;
+    for (let line of lines) {
+      if (line.trim() === '') {
+        if (!lastWasEmpty) {
+          cleaned.push('');
+        }
+        lastWasEmpty = true;
+      } else {
+        cleaned.push(line);
+        lastWasEmpty = false;
+      }
+    }
+
+    return cleaned.join('\n').trim();
+  }
+
+  isInsideString(line, index) {
+    let inSingle = false;
+    let inDouble = false;
+    for (let i = 0; i < index; i++) {
+      if (line[i] === "'" && !inDouble) inSingle = !inSingle;
+      if (line[i] === '"' && !inSingle) inDouble = !inDouble;
+    }
+    return inSingle || inDouble;
+  }
+
+  async processFiles() {
+    const separator = document.getElementById('separator').value;
+    const outputName =
+      document.getElementById('outputName').value || 'merged_files.txt';
+    const cleanMode = document.getElementById('cleanMode').checked;
+    const commonOnly = document.getElementById('commonOnly').checked;
+    const progressBar = document.getElementById('progressBar');
+    const progressFill = document.getElementById('progressFill');
+    const processBtn = document.getElementById('processBtn');
+    const copyBtn = document.getElementById('copyBtn');
+
+    progressBar.style.display = 'block';
+    processBtn.disabled = true;
+    this.showStatus('Merging files...', 'processing');
+
+    let filteredFiles = this.files.filter((file) => {
+      const extension = this.getFileExtension(file.name);
+      if (commonOnly && !this.commonFileTypes.has(extension)) return false;
+      return this.selectedTypes.has(extension);
+    });
+
+    let mergedContent = '';
+    let processed = 0;
+
+    for (let i = 0; i < filteredFiles.length; i++) {
+      const file = filteredFiles[i];
+      const displayName = file.relativePath || file.name;
+      const fileSeparator = separator.replace('{filename}', displayName);
+
+      try {
+        let content = await this.readFile(file);
+        const extension = this.getFileExtension(file.name);
+        if (cleanMode) {
+          content = this.cleanContent(content, extension);
+        }
+        mergedContent += fileSeparator + '\n' + content + '\n\n';
+      } catch (error) {
+        console.error(`Error reading file ${file.name}:`, error);
+        mergedContent += fileSeparator + '\n[Error reading file]\n\n';
+      }
+
+      processed++;
+      const progress = (processed / filteredFiles.length) * 100;
+      progressFill.style.width = progress + '%';
+    }
+
+    this.mergedContent = mergedContent;
+    copyBtn.style.display = 'block';
+    this.downloadFile(mergedContent, outputName);
+    this.showStatus(`✅ Merged ${filteredFiles.length} files!`, 'success');
+    progressBar.style.display = 'none';
+    processBtn.disabled = false;
+  }
+
+  readFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  }
+
+  downloadFile(content, filename) {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  copyToClipboard() {
+    navigator.clipboard
+      .writeText(this.mergedContent)
+      .then(() => {
+        this.showStatus('📋 Copied to clipboard!', 'success');
+      })
+      .catch((err) => {
+        this.showStatus('❌ Failed to copy', 'error');
+        console.error('Copy failed:', err);
+      });
+  }
+
+  selectAllTypes() {
+    const checkboxes = document.querySelectorAll(
+      '#fileTypeGrid input[type="checkbox"]'
+    );
+    checkboxes.forEach((cb) => {
+      cb.checked = true;
+      this.selectedTypes.add(cb.value);
+    });
+    this.updateProcessButton();
+  }
+
+  deselectAllTypes() {
+    const checkboxes = document.querySelectorAll(
+      '#fileTypeGrid input[type="checkbox"]'
+    );
+    checkboxes.forEach((cb) => {
+      cb.checked = false;
+      this.selectedTypes.delete(cb.value);
+    });
+    this.updateProcessButton();
+  }
+}
+
+// Initialize the application
+new FolderTextMerger();
+</script>
+
 </body>
 </html>
